@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ./Backend/
+    restart: unless-stopped
+    environment:
+      - AZURE_APP_CLIENT_ID=${AZURE_APP_CLIENT_ID}
+      - AZURE_APP_CLIENT_SECRET=${AZURE_APP_CLIENT_SECRET}
+      - AZURE_APP_TENANT_ID=${AZURE_APP_TENANT_ID}
+      - AZURE_LOG_ANALYTICS_WORKSPACE_ID=${AZURE_LOG_ANALYTICS_WORKSPACE_ID}
+      - AZURE_OPENAI_CHATGPT_DEPLOYMENT=${AZURE_OPENAI_CHATGPT_DEPLOYMENT}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_RESOURCE_ID=${AZURE_RESOURCE_ID}
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    ports:
+      - '8080:8080'
+  frontend:
+    build: 
+      context: ./Frontend/
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    depends_on:
+      - "backend"

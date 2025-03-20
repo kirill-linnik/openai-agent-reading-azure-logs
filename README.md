@@ -7,7 +7,10 @@ Obviously, that uses Azure infrastructure. You will need to create following res
 2. Azure Log Analytics:
 	1. Please, create Azure Log Analytics resource. Hint: after next steps, data will arrive into tables created under this resource. By default, data retention is set to 30 days, but you can easily modify it per table.
 3. Azure Communication Services - Email:
-	1. Please, create and setup email functionality with Azure Communication Services. [This link](https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/email/create-email-communication-resource?pivots=platform-azp) can be a good start.
+	1. Please, create and setup email functionality with Azure Communication Services. [This link](https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/email/create-email-communication-resource?pivots=platform-azp) can be a good start. Important: once setup, you need to have at least 3 following resources:
+		1. Communication Service - your main Azure Communication Services resource
+		2. Email Communication Service - ACS Email resource 
+		3. Email Communication Services Domain - Resource holding link between ACS Email resource and domain to be used for email sending
 	2. Go to `Diagnostic settings` and click on `Add diagnostic settings`. 
 	Either check `allLogs` or select all email-related ones: `Email Service Send Mail Logs`, `Email Service Delivery Status Update Logs`, `Email Service User Engagement Logs`. 
 	In `Destination details` click `Send to Log Analytics workspace` and select your freshly created `Log Analytics` resource.
@@ -32,8 +35,8 @@ AZURE_OPENAI_CHATGPT_DEPLOYMENT=<name of your chat gpt deployment>
 AZURE_OPENAI_ENDPOINT=<endpoint of your Azure Open AI deployment>
 AZURE_OPENAI_API_KEY=<key for using your Azure Open AI deployment>
 AZURE_RESOURCE_ID=<resouce id created in step 1; you can copy it from the URL once you are in the resource, the format will be: /subscriptions/<subscription-id>/resourceGroups/<your-resource-group>/providers/Microsoft.Communication/CommunicationServices/<name-of-our-resource>
-AZURE_CHAT_ENDPOINT=<Grab it from Settings -> Keys of your Communication resource created in step 2>
-AZURE_CHAT_ACCESS_KEY=<Grab it from Settings -> Keys of your Communication resource created in step 2>
+AZURE_CHAT_ENDPOINT=<Grab Endpoint from Settings -> Keys of your Communication Service created in step 3>
+AZURE_CHAT_ACCESS_KEY=<Grab Key from Settings -> Keys of your Communication Service created in step 3>
 ```
 
 Then you can do:

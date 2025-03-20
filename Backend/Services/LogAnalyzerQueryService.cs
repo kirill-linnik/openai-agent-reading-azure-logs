@@ -16,17 +16,9 @@ public class LogAnalyzerQueryService
         _workspaceId = workspaceId;
     }
 
-    public async Task<LogsQueryResult?> GetLogsAsync(string query)
+    public async Task<LogsQueryResult> GetLogsAsync(string query)
     {
-        try
-        {
-            var response = await _client.QueryWorkspaceAsync(_workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(1000)));
-            return response.Value;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error querying logs");
-            return null;
-        }
+        var response = await _client.QueryWorkspaceAsync(_workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(1000)));
+        return response.Value;
     }
 }

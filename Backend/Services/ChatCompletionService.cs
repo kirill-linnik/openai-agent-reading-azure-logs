@@ -1,4 +1,5 @@
-﻿using Backend.Models;
+﻿using Azure.Monitor.Query.Models;
+using Backend.Models;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Text.Json;
@@ -9,41 +10,107 @@ namespace Backend.Services;
 public class ChatCompletionService(
     Kernel kernel,
     LogAnalyzerQueryService logAnalyzerQueryService,
-    ConversationContextService conversationContextService,
+    ChatService chatService,
     ILogger<ChatCompletionService> logger,
     string resourceId)
 {
-    public async Task<ResponseMessage> ProcessRequestAsync(ChatRequest chatRequest)
+    public async Task ProcessRequestAsync(ChatRequest chatRequest)
     {
-        var question = chatRequest.LastUserQuestion ?? throw new InvalidOperationException("No user question found");
+        var question = chatRequest.Message ?? throw new InvalidOperationException("No user question found");
+        var chatThreadId = chatRequest.ThreadId ?? throw new InvalidOperationException("No chat thread id found");
+        await chatService.SendUserMessageAsync(chatThreadId, question);
 
         // step 1: update conversation context with the last user message
-        var updatedConversationContext = await GetNewConversationContext(question);
-        conversationContextService.SetConversationContext(updatedConversationContext);
+        var currentConversationContext = await chatService.GetThreadTopic(chatThreadId);
+        var updatedConversationContext = await GetNewConversationContextAsync(question, currentConversationContext);
+        await chatService.UpdateThreadTopic(chatThreadId, updatedConversationContext);
 
         // step 2: get query
-        var query = await GetQuery(question, updatedConversationContext);
+        var query = await GetQueryAsync(question, updatedConversationContext);
+        if (!string.IsNullOrEmpty(query))
+        {
+            await chatService.SendAssistantMessageAsync(chatThreadId, $"I will try to respond to your question by executing this query first:\n```kql\n{query}\n```");
+        }
+        else
+        {
+            await chatService.SendAssistantMessageAsync(chatThreadId, "I couldn't come up with a query to answer your question. Sorry. Is there anything else I can help you with?");
+            return;
+        }
 
         // step 3: get data
         var data = string.Empty;
-        if (!string.IsNullOrWhiteSpace(query))
+
+        try
         {
             var response = await logAnalyzerQueryService.GetLogsAsync(query);
-            if (response != null)
-            {
-                data = JsonSerializer.Serialize(response.Table, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
-            }
-            logger.LogInformation($"Data: {data}");
+            data = ExtractData(response);
         }
+        catch (Exception ex)
+        {
+            // step 3.5: ok, we generated incorrect query; let's try to fix it
+            var queryFix = await FixQueryAsync(query, ex);
+
+            if (!string.IsNullOrEmpty(queryFix))
+            {
+                await chatService.SendAssistantMessageAsync(chatThreadId, $"It seems like previous query produces an error. Let me try this new query:\n ```kql\n{queryFix}\n```");
+                try
+                {
+                    var response = await logAnalyzerQueryService.GetLogsAsync(queryFix);
+                    data = ExtractData(response);
+                }
+                catch
+                {
+                    await chatService.SendAssistantMessageAsync(chatThreadId, "Updated query produces an error as well, sorry. I couldn't come up with a query to answer your question. Is there anything else I can help you with?");
+                    return;
+                }
+            }
+            else
+            {
+                await chatService.SendAssistantMessageAsync(chatThreadId, "I couldn't come up with a query to answer your question. Sorry. Is there anything else I can help you with?");
+                return;
+            }
+        }
+        logger.LogInformation($"Data: {data}");
+
+        await chatService.SendAssistantMessageAsync(chatThreadId, "I received reply from the database. Let me process it...");
 
 
         // step 4: get reply
-        var answer = await GetResponse(chatRequest.History, updatedConversationContext, data);
-
-        return new ResponseMessage("assistant", answer);
+        var answer = await GetAssistantResponseAsync(question, updatedConversationContext, data);
+        await chatService.SendAssistantMessageAsync(chatThreadId, answer);
     }
 
-    private async Task<string> GetNewConversationContext(string lastUserMessage)
+    private string ExtractData(LogsQueryResult response)
+    {
+        return JsonSerializer.Serialize(response.Table, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+    }
+
+    private async Task<string> FixQueryAsync(string query, Exception ex)
+    {
+        var chat = kernel.GetRequiredService<IChatCompletionService>();
+        var queryFixChat = new ChatHistory(@$"
+You are helpful assitant providing fix for Kusto Query Language (KQL). Analyze exception details and original KQL and provide fix to the query.
+
+## Original KQL ##
+{query}
+## End of Original KQL ##
+
+## Exception details ##
+{ex.Message}
+## End of Exception details ##
+
+Never apply formatting to your response; respond only with the query in plain text format. You cannot provide explanation on what was fixed.
+
+You cannot return more than just one query. If you want to query multiple tables, you must join it in one query.
+If you are unable to provide a query, respond with an empty message. 
+");
+        var queryFixResponse = await chat.GetChatMessageContentAsync(queryFixChat);
+        var queryFix = queryFixResponse.Content ?? throw new InvalidOperationException("Failed to get query response");
+        logger.LogInformation($"Fixed query: {queryFix}");
+        return queryFix;
+    }
+
+    private async Task<string> GetNewConversationContextAsync(string lastUserMessage, string currentConversationContext)
     {
         var chat = kernel.GetRequiredService<IChatCompletionService>();
         var conversationContextChat = new ChatHistory(@$"
@@ -62,7 +129,7 @@ You should reply only with the content of updated conversation context.
 ## End of Instructions ##
 
 ## Current conversation context ##
-{conversationContextService.GetConversationContext()}
+{currentConversationContext}
 ## End of current conversation context ##
 
 ## Examples ##
@@ -89,7 +156,7 @@ Your response: User asks how many emails were not delivered last month.
         return updatedConversationContext;
     }
 
-    private async Task<string> GetQuery(string lastUserMessage, string updatedConversationContext)
+    private async Task<string> GetQueryAsync(string lastUserMessage, string updatedConversationContext)
     {
         var fixedResourceId = resourceId.ToLowerInvariant();
         var now = DateTimeOffset.UtcNow;
@@ -228,7 +295,7 @@ Your response is empty
         return query;
     }
 
-    private async Task<string> GetResponse(ChatMessage[] history, string updatedConversationContext, string data)
+    private async Task<string> GetAssistantResponseAsync(string question, string updatedConversationContext, string data)
     {
         var chat = kernel.GetRequiredService<IChatCompletionService>();
         var metricsChat = new ChatHistory(@$"
@@ -248,18 +315,7 @@ If metrics data is empty then it means no data was found. For example, is user a
 Be as precise and short as possible. Provide the user with the requested information. Use markdown language in your response where needed
 ## End of Instructions ##
 ");
-        for (var i = 0; i < history.Length; i++)
-        {
-            var message = history[i];
-            if (message.Role == "user")
-            {
-                metricsChat.AddUserMessage(message.Content);
-            }
-            else
-            {
-                metricsChat.AddAssistantMessage(message.Content);
-            }
-        }
+        metricsChat.AddUserMessage(question);
         var metricsResponse = await chat.GetChatMessageContentAsync(metricsChat);
         var answer = metricsResponse.Content ?? throw new InvalidOperationException("Failed to get metrics response");
 

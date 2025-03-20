@@ -1,4 +1,4 @@
 export enum ChatRole {
-  ASSISTANT = "assistant",
-  USER = "user",
+  ASSISTANT = "ASSISTANT",
+  USER = "USER",
 }

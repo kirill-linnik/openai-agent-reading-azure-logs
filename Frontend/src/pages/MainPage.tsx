@@ -1,10 +1,10 @@
 import { SendOutlined } from "@ant-design/icons";
 import { Button, DatePicker, Form, Input } from "antd";
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { ChatRole } from "../models/ChatRole";
 import { useAppDispatch, useAppSelector } from "../store";
-import { addChatMessage } from "../store/actions/chatActions";
+import { addChatMessage, createChatThread, fetchFreshMessages } from "../store/actions/chatActions";
 import "./ChatStyles.css";
 
 const { RangePicker } = DatePicker;
@@ -14,6 +14,23 @@ const MainPage: FC = () => {
   const chat = useAppSelector((state) => state.chat);
 
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (!chat.threadId) {
+      dispatch(createChatThread());
+    }
+  }, [chat.threadId, dispatch]);
+
+  useEffect(() => {
+    if (chat.threadId) {
+      const interval = setInterval(() => {
+        const lastMessageId =
+          chat.history.length > 0 ? chat.history[chat.history.length - 1].id : undefined;
+        dispatch(fetchFreshMessages(chat.threadId!, lastMessageId));
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [chat.threadId, chat.history, dispatch]);
 
   const displayChatHistory = (): ReactNode => {
     const chatBubbles = chat.history.map((message, index) => {
@@ -50,6 +67,8 @@ const MainPage: FC = () => {
 
   return (
     <div className="container">
+      ACS chat thread id: <strong>{chat.threadId}</strong>
+      <br />
       {displayChatHistory()}
       <div className="msg-bottom">
         <div className="input-group">
@@ -61,7 +80,7 @@ const MainPage: FC = () => {
             form={form}
             layout="inline"
             onFinish={(values) => {
-              dispatch(addChatMessage([...chat.history], values.text));
+              dispatch(addChatMessage(chat.threadId!, values.text));
               form.resetFields();
             }}
           >
@@ -77,7 +96,7 @@ const MainPage: FC = () => {
               <Input placeholder="Type a message" />
             </Form.Item>
             <Form.Item>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" disabled={chat.threadId === undefined} htmlType="submit">
                 <SendOutlined />
               </Button>
             </Form.Item>

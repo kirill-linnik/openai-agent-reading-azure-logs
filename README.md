@@ -32,6 +32,8 @@ AZURE_OPENAI_CHATGPT_DEPLOYMENT=<name of your chat gpt deployment>
 AZURE_OPENAI_ENDPOINT=<endpoint of your Azure Open AI deployment>
 AZURE_OPENAI_API_KEY=<key for using your Azure Open AI deployment>
 AZURE_RESOURCE_ID=<resouce id created in step 1; you can copy it from the URL once you are in the resource, the format will be: /subscriptions/<subscription-id>/resourceGroups/<your-resource-group>/providers/Microsoft.Communication/CommunicationServices/<name-of-our-resource>
+AZURE_CHAT_ENDPOINT=<Grab it from Settings -> Keys of your Communication resource created in step 2>
+AZURE_CHAT_ACCESS_KEY=<Grab it from Settings -> Keys of your Communication resource created in step 2>
 ```
 
 Then you can do:

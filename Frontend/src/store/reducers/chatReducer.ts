@@ -1,8 +1,10 @@
-import { ChatRole } from "../../models/ChatRole";
+import { ChatMessage } from "../../models/ChatMessage";
 import {
   CHAT_ADD_MESSAGE_FAILURE,
-  CHAT_ADD_MESSAGE_REQUEST,
-  CHAT_ADD_MESSAGE_SUCCESS,
+  CHAT_CREATE_THREAD_FAILURE,
+  CHAT_CREATE_THREAD_SUCCESS,
+  CHAT_FETCH_FRESH_MESSAGES_FAILURE,
+  CHAT_FETCH_FRESH_MESSAGES_SUCCESS,
   ChatState,
 } from "../types/chatTypes";
 import commonReducer from "./commonReducer";
@@ -13,22 +15,25 @@ const initialState: ChatState = {
 
 const chatReducer = (state = initialState, action: any): ChatState => {
   switch (action.type) {
-    case CHAT_ADD_MESSAGE_REQUEST:
+    case CHAT_CREATE_THREAD_SUCCESS:
       return {
         ...state,
-        history: [
-          ...state.history,
-          {
-            role: ChatRole.USER,
-            content: action.message,
-          },
-        ],
+        threadId: action.threadId,
       };
-    case CHAT_ADD_MESSAGE_SUCCESS:
+    case CHAT_FETCH_FRESH_MESSAGES_SUCCESS:
+      const newHistory = [...state.history];
+      action.messages.forEach((message: ChatMessage) => {
+        if (!newHistory.find((m) => m.id === message.id)) { //sometimes we get messages we already have
+          newHistory.push(message);
+        }
+      });
+      newHistory.sort((a, b) => a.createdOn.diff(b.createdOn));
       return {
         ...state,
-        history: [...state.history, action.message],
+        history: newHistory,
       };
+    case CHAT_FETCH_FRESH_MESSAGES_FAILURE:
+    case CHAT_CREATE_THREAD_FAILURE:
     case CHAT_ADD_MESSAGE_FAILURE:
       return {
         ...state,

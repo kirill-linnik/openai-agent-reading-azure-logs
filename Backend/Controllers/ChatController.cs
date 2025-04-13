@@ -1,6 +1,7 @@
 ﻿using Backend.Models;
 using Backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace Backend.Controllers;
 
@@ -26,7 +27,27 @@ public class ChatController(ChatCompletionService chatCompletionService, ChatSer
     public async Task<IActionResult> GetMessagesAsync([FromRoute] string threadId, [FromQuery] string? lastMessageId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(threadId, nameof(threadId));
-        var messages = await chatService.GetFreshMessagesAsync(threadId, lastMessageId);
+        var chatHistory = await chatService.GetFreshMessagesAsync(threadId, lastMessageId);
+
+        var messages = new List<ChatMessage>();
+        foreach (var message in chatHistory)
+        {
+            if (message.Metadata is not null &&
+                message.Metadata.TryGetValue("id", out var idObj) &&
+                idObj is string id &&
+                message.Metadata.TryGetValue("createdOn", out var createdOnObj) &&
+                createdOnObj is DateTimeOffset createdOn &&
+                !string.IsNullOrWhiteSpace(message.Content) &&
+                (message.Role == AuthorRole.Assistant || message.Role == AuthorRole.User))
+            {
+                messages.Add(new ChatMessage(
+                    Id: id,
+                    Role: message.Role.Label.ToUpperInvariant(),
+                    CreatedOn: createdOn,
+                    Content: message.Content
+                ));
+            }
+        }
         return Ok(messages);
     }
 }

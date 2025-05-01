@@ -2,6 +2,7 @@
 using Azure.Communication;
 using Azure.Communication.Chat;
 using Azure.Communication.Identity;
+using Backend.KernelPlugins;
 using Backend.Services;
 using Microsoft.SemanticKernel;
 
@@ -11,6 +12,10 @@ internal static class ServiceCollectionExtensions
 {
     internal static IServiceCollection AddServices(this IServiceCollection services)
     {
+        services.AddMcpServer().WithToolsFromAssembly();
+
+        services.AddSingleton<KustoPlugin>();
+
         services.AddSingleton(sp =>
         {
             var azureOpenAiServiceEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
@@ -23,8 +28,14 @@ internal static class ServiceCollectionExtensions
             var kernelBuilder = Kernel.CreateBuilder();
             kernelBuilder = kernelBuilder.AddAzureOpenAIChatCompletion(deployedModelName, azureOpenAiServiceEndpoint, azureOpenAiServiceApiKey);
 
-            return kernelBuilder.Build();
+            var kustoPlugin = sp.GetRequiredService<KustoPlugin>();
+
+            var kernel = kernelBuilder.Build();
+            kernel.ImportPluginFromObject(kustoPlugin);
+
+            return kernel;
         });
+
 
         services.AddSingleton(sp =>
         {
@@ -75,14 +86,14 @@ internal static class ServiceCollectionExtensions
         services.AddSingleton(sp =>
         {
             var kernel = sp.GetRequiredService<Kernel>();
-            var logAnalyzerQueryService = sp.GetRequiredService<LogAnalyzerQueryService>();
             var chatService = sp.GetRequiredService<ChatService>();
             var logger = sp.GetRequiredService<ILogger<ChatCompletionService>>();
             var resourceId = Environment.GetEnvironmentVariable("AZURE_RESOURCE_ID");
             ArgumentException.ThrowIfNullOrWhiteSpace(resourceId);
 
-            return new ChatCompletionService(kernel, logAnalyzerQueryService, chatService, logger, resourceId);
+            return new ChatCompletionService(kernel, chatService, logger, resourceId);
         });
+
 
         return services;
     }

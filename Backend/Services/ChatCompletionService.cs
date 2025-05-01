@@ -32,7 +32,7 @@ Ask clarifying questions if the intent is unclear and make decisions which param
 Always explain all steps you are going to take to the user. Include all relevant information in the explanation: queries, parameters, etc.
 
 For reference, current time is {DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ} UTC.
-User resource id is {resourceId.ToLowerInvariant()}.",
+If you need to generate KQL query for Log Analyzer workspace, ALWAYS add limition by _ResourceId column with value ""{resourceId.ToLowerInvariant()}"".",
             Arguments = new KernelArguments(
             new OpenAIPromptExecutionSettings
             {

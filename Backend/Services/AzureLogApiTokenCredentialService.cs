@@ -11,25 +11,24 @@ public class AzureLogApiTokenCredentialService(string tenantId, string clientId,
 
     public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
     {
-        if (token.ExpiresOn <= DateTimeOffset.Now)
-        {
-            token = GetToken();
-        }
+        token = GetToken();
         return token;
     }
 
     public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken)
     {
-        if (token.ExpiresOn <= DateTimeOffset.Now)
-        {
-            token = GetToken();
-        }
+        token = GetToken();
         return new ValueTask<AccessToken>(token);
     }
 
     private AccessToken GetToken()
     {
-        string[] scopes = new[] { "https://api.loganalytics.io/.default" };
+        if (token.ExpiresOn > DateTimeOffset.Now)
+        {
+            return token;
+        }
+
+        string[] scopes = ["https://api.loganalytics.io/.default"];
 
         IConfidentialClientApplication app = ConfidentialClientApplicationBuilder.Create(clientId)
             .WithClientSecret(clientSecret)

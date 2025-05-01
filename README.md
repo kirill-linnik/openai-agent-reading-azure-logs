@@ -1,4 +1,4 @@
-# Azure OpenAI MCP Agent Demo on top of Log Analyzer workspace
+# Azure OpenAI Simple Agent Demo on top of Log Analyzer workspace
 
 ## Infrastructure
 Obviously, that uses Azure infrastructure. You will need to create following resources (please, follow the sequence):

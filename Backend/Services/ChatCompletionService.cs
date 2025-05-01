@@ -48,14 +48,14 @@ public class ChatCompletionService(
         catch (Exception ex)
         {
             // step 3.5: ok, we generated incorrect query; let's try to fix it
-            var queryFix = await FixQueryAsync(query, ex);
+            query = await FixQueryAsync(query, ex);
 
-            if (!string.IsNullOrEmpty(queryFix))
+            if (!string.IsNullOrEmpty(query))
             {
-                await chatService.SendAssistantMessageAsync(chatThreadId, $"It seems like previous query produces an error. Let me try this new query:\n ```kql\n{queryFix}\n```");
+                await chatService.SendAssistantMessageAsync(chatThreadId, $"It seems like previous query produces an error. Let me try this new query:\n ```kql\n{query}\n```");
                 try
                 {
-                    var response = await logAnalyzerQueryService.GetLogsAsync(queryFix);
+                    var response = await logAnalyzerQueryService.GetLogsAsync(query);
                     data = ExtractData(response);
                 }
                 catch
@@ -76,7 +76,7 @@ public class ChatCompletionService(
 
 
         // step 4: get reply
-        var answer = await GetAssistantResponseAsync(question, updatedConversationContext, data);
+        var answer = await GetAssistantResponseAsync(question, updatedConversationContext, query, data);
         await chatService.SendAssistantMessageAsync(chatThreadId, answer);
     }
 
@@ -295,16 +295,20 @@ Your response is empty
         return query;
     }
 
-    private async Task<string> GetAssistantResponseAsync(string question, string updatedConversationContext, string data)
+    private async Task<string> GetAssistantResponseAsync(string question, string updatedConversationContext, string query, string data)
     {
         var chat = kernel.GetRequiredService<IChatCompletionService>();
         var metricsChat = new ChatHistory(@$"
 You are an assistant providing response to user message based on the metrics, instructions and conversation context. 
 Make sense of this metric data and provide the user with the requested information.
 
-## Metrics data ##
+## KQL query used to get the metrics data ##
+{query}
+## End of KQL query ##
+
+## Metrics data received ##
 {data}
-## End of Metrics data ##
+## End of Metrics data received ##
 
 ## Conversation context ##
 {updatedConversationContext}

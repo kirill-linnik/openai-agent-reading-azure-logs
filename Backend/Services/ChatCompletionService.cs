@@ -1,4 +1,4 @@
-﻿using Backend.Models;
+using Backend.Models;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Connectors.OpenAI;

@@ -256,3 +256,13 @@ p.text {
     font-size: 28px;
   }
 }
+
+/* tables in response to the chat */
+.received-msg-inbox table {
+  border-collapse: collapse;
+}
+
+.received-msg-inbox th, td {
+  padding: 6px 13px;
+  border: 1px solid black;
+}

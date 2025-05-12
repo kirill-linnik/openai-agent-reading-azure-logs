@@ -6,6 +6,7 @@ import { ChatRole } from "../models/ChatRole";
 import { useAppDispatch, useAppSelector } from "../store";
 import { addChatMessage, createChatThread, fetchFreshMessages } from "../store/actions/chatActions";
 import "./ChatStyles.css";
+import remarkGfm from "remark-gfm";
 
 const { RangePicker } = DatePicker;
 
@@ -49,7 +50,7 @@ const MainPage: FC = () => {
               <div className="received-msg">
                 <div className="received-msg-inbox">
                   <p className="text">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                   </p>
                 </div>
               </div>
